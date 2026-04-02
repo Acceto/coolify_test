@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Réservation Équipements Laboratoire</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <header class="header">
+            <h1>🔬 Réservation Équipements Laboratoire</h1>
+            <p class="subtitle">Gestion des réservations d'équipements</p>
+        </header>
+
+        <div class="container">
+            <!-- Section Équipements Disponibles -->
+            <section class="section">
+                <h2>📋 Équipements Disponibles</h2>
+                <div class="equipments-grid">
+                    <div v-for="equipment in equipments" :key="equipment.id" class="equipment-card">
+                        <div class="equipment-header">
+                            <h3>{{ equipment.name }}</h3>
+                            <span class="badge" :class="getStatusClass(equipment)">
+                                {{ getAvailableCount(equipment.id) }}/{{ equipment.quantity }} disponible(s)
+                            </span>
+                        </div>
+                        <p class="equipment-description">{{ equipment.description }}</p>
+                        <div class="equipment-specs">
+                            <span v-if="equipment.specs" class="spec">{{ equipment.specs }}</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section Formulaire de Réservation -->
+            <section class="section">
+                <h2>📅 Nouvelle Réservation</h2>
+                <form @submit.prevent="makeReservation" class="reservation-form">
+                    <div class="form-group">
+                        <label for="equipment">Équipement :</label>
+                        <select v-model="newReservation.equipmentId" id="equipment" required>
+                            <option value="">-- Sélectionnez un équipement --</option>
+                            <option v-for="eq in equipments" :key="eq.id" :value="eq.id">
+                                {{ eq.name }} ({{ getAvailableCount(eq.id) }}/{{ eq.quantity }} disponible)
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="date">Date :</label>
+                            <input v-model="newReservation.date" type="date" id="date" required :min="minDate">
+                        </div>
+                        <div class="form-group">
+                            <label for="startTime">Heure de début :</label>
+                            <select v-model="newReservation.startTime" id="startTime" required>
+                                <option value="">-- Sélectionnez --</option>
+                                <option v-for="time in timeSlots" :key="time" :value="time">
+                                    {{ time }}
+                                </option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="endTime">Heure de fin :</label>
+                            <select v-model="newReservation.endTime" id="endTime" required>
+                                <option value="">-- Sélectionnez --</option>
+                                <option v-for="time in getAvailableEndTimes()" :key="time" :value="time">
+                                    {{ time }}
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="userName">Nom :</label>
+                        <input v-model="newReservation.userName" type="text" id="userName" required placeholder="Votre nom">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="userEmail">Email :</label>
+                        <input v-model="newReservation.userEmail" type="email" id="userEmail" required placeholder="votre@email.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="notes">Notes :</label>
+                        <textarea v-model="newReservation.notes" id="notes" placeholder="Détails ou commentaires supplémentaires..."></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">✓ Réserver</button>
+                </form>
+
+                <div v-if="message" :class="['message', messageType]">
+                    {{ message }}
+                </div>
+            </section>
+
+            <!-- Section Calendrier et Disponibilités -->
+            <section class="section">
+                <h2>📊 Vue Calendrier</h2>
+                <div class="calendar-section">
+                    <div class="calendar-filter">
+                        <label for="filterEquipment">Filtrer par équipement :</label>
+                        <select v-model="filterEquipmentId" id="filterEquipment">
+                            <option value="">-- Tous les équipements --</option>
+                            <option v-for="eq in equipments" :key="eq.id" :value="eq.id">
+                                {{ eq.name }}
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="reservations-by-day">
+                        <div v-for="day in getUpcomingDays()" :key="day" class="day-card">
+                            <h4>{{ formatDate(day) }}</h4>
+                            <div v-if="getReservationsForDay(day).length > 0" class="day-reservations">
+                                <div v-for="res in getReservationsForDay(day)" :key="res.id" class="reservation-item">
+                                    <strong>{{ res.equipmentName }}</strong> - {{ res.startTime }} à {{ res.endTime }}
+                                    <p class="small">{{ res.userName }}</p>
+                                </div>
+                            </div>
+                            <div v-else class="no-reservations">
+                                Aucune réservation
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section Historique des Réservations -->
+            <section class="section">
+                <h2>📝 Historique des Réservations</h2>
+                <div class="filters">
+                    <button
+                        @click="filterStatus = 'all'"
+                        :class="['filter-btn', { active: filterStatus === 'all' }]"
+                    >
+                        Toutes ({{ reservations.length }})
+                    </button>
+                    <button
+                        @click="filterStatus = 'upcoming'"
+                        :class="['filter-btn', { active: filterStatus === 'upcoming' }]"
+                    >
+                        À venir ({{ getUpcomingReservations().length }})
+                    </button>
+                    <button
+                        @click="filterStatus = 'past'"
+                        :class="['filter-btn', { active: filterStatus === 'past' }]"
+                    >
+                        Passées ({{ getPastReservations().length }})
+                    </button>
+                </div>
+
+                <div v-if="getFilteredReservations().length > 0" class="reservations-list">
+                    <div v-for="res in getFilteredReservations()" :key="res.id" class="reservation-card">
+                        <div class="reservation-header">
+                            <h4>{{ res.equipmentName }}</h4>
+                            <span :class="['status-badge', res.status]">{{ res.status }}</span>
+                        </div>
+                        <div class="reservation-details">
+                            <p><strong>Date :</strong> {{ formatDate(res.date) }}</p>
+                            <p><strong>Horaire :</strong> {{ res.startTime }} - {{ res.endTime }}</p>
+                            <p><strong>Réservé par :</strong> {{ res.userName }} ({{ res.userEmail }})</p>
+                            <p v-if="res.notes"><strong>Notes :</strong> {{ res.notes }}</p>
+                        </div>
+                        <div class="reservation-actions">
+                            <button
+                                @click="cancelReservation(res.id)"
+                                v-if="res.status === 'À venir'"
+                                class="btn btn-danger btn-small"
+                            >
+                                ✕ Annuler
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div v-else class="no-data">
+                    Aucune réservation trouvée.
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
