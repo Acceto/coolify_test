@@ -1,0 +1,16 @@
+{
+  "name": "reservation-labo",
+  "version": "1.0.0",
+  "description": "Application de réservation d'équipements de laboratoire",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["reservation", "laboratoire", "equipements"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
