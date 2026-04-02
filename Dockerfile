@@ -34,11 +34,11 @@ RUN chown -R node:node /app && chmod -R 755 /app
 USER node
 
 # Exposer le port
-EXPOSE 3000
+EXPOSE 3010
 
 # Health check avec curl (plus fiable)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:3000/ || exit 1
+    CMD curl -f http://localhost:3010/ || exit 1
 
 # Utiliser dumb-init pour lancer l'application
 ENTRYPOINT ["dumb-init", "--"]
